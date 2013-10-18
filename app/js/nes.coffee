@@ -1,0 +1,2 @@
+window.NES = ->
+	"test NES"
