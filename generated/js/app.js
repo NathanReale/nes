@@ -1808,7 +1808,7 @@ return __p
 
   window.start = function() {
     var romName, xhr;
-    romName = 'NEStress.nes';
+    romName = 'nestress.nes';
     if (localStorage[romName]) {
       return run(str2ab(localStorage[romName]));
     } else {

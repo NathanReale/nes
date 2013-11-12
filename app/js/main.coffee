@@ -1,6 +1,6 @@
 window.start = ->
 	#romName = 'nestest.nes'
-	romName = 'NEStress.nes'
+	romName = 'nestress.nes'
 	#romName = 'palette_ram.nes'
 	#romName = 'vram_access.nes'
 	#romName = 'Donkey Kong.nes'
