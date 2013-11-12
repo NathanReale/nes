@@ -2,6 +2,8 @@ window.start = ->
 	#romName = 'nestest.nes'
 	romName = 'NEStress.nes'
 	#romName = 'palette_ram.nes'
+	#romName = 'vram_access.nes'
+	#romName = 'Donkey Kong.nes'
 	if localStorage[romName]
 		run str2ab(localStorage[romName])
 	else 
@@ -21,7 +23,7 @@ window.run = (data) ->
 
 	#while nes.step() then
 	#nes.step() for c in [0...24758]
-	nes.step() for num in [0...400000]
+	nes.step() for num in [0...100000]
 	#nes.debug()
 
 	canvas = document.getElementById('screen')
@@ -49,5 +51,5 @@ printScreen = (nes, canvas) ->
 
 			for x in [0...8] by 1
 				for y in [0...8] by 1
-					ctx.fillStyle = tile[x][y].toString(16)
+					ctx.fillStyle = tile[x][y]
 					ctx.fillRect(col*24 + (y*3), row*24 + (x*3), 3, 3)

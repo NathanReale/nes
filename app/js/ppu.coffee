@@ -30,30 +30,50 @@ class window.PPU
 		console.log @reg, @hasChrRam, @rom.chr, @vram
 
 	getVRam: (addr) ->
+		#console.log("get", addr.toString(16))
 		if not @hasChrRam and addr < 0x2000
 			return @rom.getVRom(addr)
+		else if addr >= 0x3000 and addr < 0x3F00
+			return @vram[addr - 0x1000]
+		else if addr >= 0x3F00 and addr < 0x4000
+			addr = addr & 0x1F
+			if addr >= 0x10 and (addr & 0x3) == 0
+				addr -= 0x10
+			return @vram[0x3F00 + addr]
 		else
 			return @vram[addr]
 
 	setVRam: (addr, value) ->
-		@vram[addr] = value
+		#console.log("set", addr.toString(16), value.toString(16))
+		if addr >= 0x3000 and addr < 0x3F00
+			@vram[addr - 0x1000] = value
+		else if addr >= 0x3F00 and addr < 0x4000
+			addr = addr & 0x1F
+			if addr >= 0x10 and (addr & 0x3) == 0
+				addr -= 0x10
+			@vram[0x3F00 + addr] = value
+		else
+			@vram[addr] = value
 
 	getReg: (addr) ->
+		#console.log "get", addr.toString(16), @address.toString(16)
 		switch addr
 			when 2
+				@firstAddr = @firstScroll = true
 				return 0x80
 			when 4
 				return @oam[@oamAddr]
 			when 7
-				console.log(@address.toString(16), @readBuffer, @getVRam(@address))
+				#console.log(@address.toString(16), @readBuffer, @getVRam(@address))
 				if @address >= 0x3F00
-					@readBuffer = @getVRam(@address)
-					#@address = (@address + 1) % 0x4000
-					return @readBuffer
+					ret = @getVRam(@address)
+					@readBuffer = @getVRam(@address - 0x1000)
+					@address = (@address + 1)
+					return ret
 				else
 					ret = @readBuffer
 					@readBuffer = @getVRam(@address)
-					#@address = (@address + 1) % 0x4000
+					@address = (@address + 1)
 					return ret
 
 	setReg: (addr, value) ->
@@ -61,6 +81,10 @@ class window.PPU
 		@reg[addr] = value
 
 		switch addr
+			when 0
+				console.log("set controller", value.toString(2))
+			when 1
+				console.log("set mask", value.toString(2))
 			when 3
 				@oamAddr = value
 			when 4
@@ -86,7 +110,7 @@ class window.PPU
 			when 7
 				# console.log "set vram", @address.toString(16), value.toString(16)
 				@setVRam(@address, value)
-				@address = (@address + 1) % 0x4000
+				@address = (@address + 1)
 
 	oamDma: (value) ->
 		@oam[i] = @ram.get(value | i) for i in [0...0x100]

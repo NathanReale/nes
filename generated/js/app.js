@@ -1326,9 +1326,6 @@ return __p
             throw "Address " + op.addr + " not implemented.";
         }
       }).call(this);
-      if (addr !== null && addr !== 'A') {
-        value = this.ram.get(addr);
-      }
       this.reg.p.add(op.bytes);
       debugStr += (addr !== null ? addr.toString(16) : ' ') + '  \t';
       if (this.printDebug) {
@@ -1336,6 +1333,7 @@ return __p
       }
       switch (op.cmd) {
         case 'ADC':
+          value = this.ram.get(addr);
           this.reg.a.add(value, this.status.carry);
           this.status.carry = this.reg.a.carry;
           this.status.zero = this.reg.a.zero;
@@ -1343,6 +1341,7 @@ return __p
           this.status.negative = this.reg.a.neg;
           break;
         case 'AND':
+          value = this.ram.get(addr);
           this.reg.a.set(this.reg.a.val & value);
           this.status.zero = this.reg.a.zero;
           this.status.negative = this.reg.a.neg;
@@ -1378,6 +1377,7 @@ return __p
           }
           break;
         case 'BIT':
+          value = this.ram.get(addr);
           this.status.zero = (this.reg.a.val & value) === 0;
           this.status.overflow = (value & 0x40) !== 0;
           this.status.negative = (value & 0x80) !== 0;
@@ -1419,18 +1419,21 @@ return __p
           this.status.decimal = false;
           break;
         case 'CMP':
+          value = this.ram.get(addr);
           this.status.carry = this.reg.a.val >= value;
           temp = (this.reg.a.val - value + 0x100) & 0xFF;
           this.status.zero = temp === 0;
           this.status.negative = temp > 0x7F;
           break;
         case 'CPX':
+          value = this.ram.get(addr);
           temp = (this.reg.x.val - value + 0x100) & 0xFF;
           this.status.carry = temp <= 0x80;
           this.status.zero = temp === 0;
           this.status.negative = temp > 0x7F;
           break;
         case 'CPY':
+          value = this.ram.get(addr);
           temp = (this.reg.y.val - value + 0x100) & 0xFF;
           this.status.carry = temp <= 0x80;
           this.status.zero = temp === 0;
@@ -1454,6 +1457,7 @@ return __p
           this.status.negative = this.reg.y.neg;
           break;
         case 'EOR':
+          value = this.ram.get(addr);
           this.reg.a.set(this.reg.a.val ^ value);
           this.status.zero = this.reg.a.zero;
           this.status.negative = this.reg.a.neg;
@@ -1485,16 +1489,19 @@ return __p
           this.reg.p.set(addr);
           break;
         case 'LDA':
+          value = this.ram.get(addr);
           this.reg.a.set(value);
           this.status.zero = this.reg.a.zero;
           this.status.negative = this.reg.a.neg;
           break;
         case 'LDX':
+          value = this.ram.get(addr);
           this.reg.x.set(value);
           this.status.zero = this.reg.x.zero;
           this.status.negative = this.reg.x.neg;
           break;
         case 'LDY':
+          value = this.ram.get(addr);
           this.reg.y.set(value);
           this.status.zero = this.reg.y.zero;
           this.status.negative = this.reg.y.neg;
@@ -1518,6 +1525,7 @@ return __p
           0;
           break;
         case 'ORA':
+          value = this.ram.get(addr);
           this.reg.a.set(this.reg.a.val | value);
           this.status.zero = this.reg.a.zero;
           this.status.negative = this.reg.a.neg;
@@ -1577,6 +1585,7 @@ return __p
           this.reg.p.add(1);
           break;
         case 'SBC':
+          value = this.ram.get(addr);
           this.reg.a.sub(value, !this.status.carry);
           this.status.carry = this.reg.a.val < 0x80;
           this.status.zero = this.reg.a.zero;
@@ -1630,7 +1639,7 @@ return __p
           this.status.negative = this.reg.a.neg;
           break;
         case 'DCP':
-          value = ((value + 0x100) - 1) & 0xFF;
+          value = ((this.ram.get(addr) + 0x100) - 1) & 0xFF;
           this.ram.set(addr, value);
           this.status.carry = this.reg.a.val >= value;
           temp = (this.reg.a.val - value + 0x100) & 0xFF;
@@ -1638,7 +1647,7 @@ return __p
           this.status.negative = temp > 0x7F;
           break;
         case 'ISC':
-          value = (value + 1) & 0xFF;
+          value = (this.ram.get(addr) + 1) & 0xFF;
           this.ram.set(addr, value);
           this.reg.a.sub(value, !this.status.carry);
           this.status.carry = this.reg.a.val >= 0x80;
@@ -1647,12 +1656,14 @@ return __p
           this.status.negative = this.reg.a.neg;
           break;
         case 'LAX':
+          value = this.ram.get(addr);
           this.reg.a.set(value);
           this.reg.x.set(value);
           this.status.zero = this.reg.a.zero;
           this.status.negative = this.reg.a.neg;
           break;
         case 'RLA':
+          value = this.ram.get(addr);
           oldCarry = this.status.carry ? 0x01 : 0x0;
           this.status.carry = (value & 0x80) !== 0;
           value = ((value << 1) & 0xFF) | oldCarry;
@@ -1662,6 +1673,7 @@ return __p
           this.status.negative = this.reg.a.neg;
           break;
         case 'RRA':
+          value = this.ram.get(addr);
           oldCarry = this.status.carry ? 0x80 : 0x0;
           this.status.carry = (value & 0x01) !== 0;
           value = (value >> 1) | oldCarry;
@@ -1677,6 +1689,7 @@ return __p
           this.ram.set(addr, temp);
           break;
         case 'SLO':
+          value = this.ram.get(addr);
           this.status.carry = (value & 0x80) !== 0;
           value = (value << 1) & 0xFF;
           this.ram.set(addr, value);
@@ -1685,6 +1698,7 @@ return __p
           this.status.negative = this.reg.a.neg;
           break;
         case 'SRE':
+          value = this.ram.get(addr);
           this.status.carry = (value & 0x01) !== 0;
           value = value >> 1;
           this.ram.set(addr, value);
@@ -1814,7 +1828,7 @@ return __p
   window.run = function(data) {
     var canvas, nes, num, _i;
     nes = new NES(data, false);
-    for (num = _i = 0; _i < 400000; num = ++_i) {
+    for (num = _i = 0; _i < 100000; num = ++_i) {
       nes.step();
     }
     canvas = document.getElementById('screen');
@@ -1839,7 +1853,7 @@ return __p
                 var _l, _results3;
                 _results3 = [];
                 for (y = _l = 0; _l < 8; y = _l += 1) {
-                  ctx.fillStyle = tile[x][y].toString(16);
+                  ctx.fillStyle = tile[x][y];
                   _results3.push(ctx.fillRect(col * 24 + (y * 3), row * 24 + (x * 3), 3, 3));
                 }
                 return _results3;
@@ -3346,30 +3360,51 @@ return __p
     PPU.prototype.getVRam = function(addr) {
       if (!this.hasChrRam && addr < 0x2000) {
         return this.rom.getVRom(addr);
+      } else if (addr >= 0x3000 && addr < 0x3F00) {
+        return this.vram[addr - 0x1000];
+      } else if (addr >= 0x3F00 && addr < 0x4000) {
+        addr = addr & 0x1F;
+        if (addr >= 0x10 && (addr & 0x3) === 0) {
+          addr -= 0x10;
+        }
+        return this.vram[0x3F00 + addr];
       } else {
         return this.vram[addr];
       }
     };
 
     PPU.prototype.setVRam = function(addr, value) {
-      return this.vram[addr] = value;
+      if (addr >= 0x3000 && addr < 0x3F00) {
+        return this.vram[addr - 0x1000] = value;
+      } else if (addr >= 0x3F00 && addr < 0x4000) {
+        addr = addr & 0x1F;
+        if (addr >= 0x10 && (addr & 0x3) === 0) {
+          addr -= 0x10;
+        }
+        return this.vram[0x3F00 + addr] = value;
+      } else {
+        return this.vram[addr] = value;
+      }
     };
 
     PPU.prototype.getReg = function(addr) {
       var ret;
       switch (addr) {
         case 2:
+          this.firstAddr = this.firstScroll = true;
           return 0x80;
         case 4:
           return this.oam[this.oamAddr];
         case 7:
-          console.log(this.address.toString(16), this.readBuffer, this.getVRam(this.address));
           if (this.address >= 0x3F00) {
-            this.readBuffer = this.getVRam(this.address);
-            return this.readBuffer;
+            ret = this.getVRam(this.address);
+            this.readBuffer = this.getVRam(this.address - 0x1000);
+            this.address = this.address + 1;
+            return ret;
           } else {
             ret = this.readBuffer;
             this.readBuffer = this.getVRam(this.address);
+            this.address = this.address + 1;
             return ret;
           }
       }
@@ -3378,6 +3413,10 @@ return __p
     PPU.prototype.setReg = function(addr, value) {
       this.reg[addr] = value;
       switch (addr) {
+        case 0:
+          return console.log("set controller", value.toString(2));
+        case 1:
+          return console.log("set mask", value.toString(2));
         case 3:
           return this.oamAddr = value;
         case 4:
@@ -3399,7 +3438,7 @@ return __p
           return this.firstAddr = !this.firstAddr;
         case 7:
           this.setVRam(this.address, value);
-          return this.address = (this.address + 1) % 0x4000;
+          return this.address = this.address + 1;
       }
     };
 

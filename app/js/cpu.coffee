@@ -61,10 +61,7 @@ class window.CPU
 			else
 				#null
 				throw "Address " + op.addr + " not implemented."
-
-		# Some commands want the address, some want the value
-		if addr != null && addr != 'A'
-			value = @ram.get(addr)
+			
 
 		# Increment Program Counter - Only matters if there is no jump/branch
 		@reg.p.add(op.bytes)
@@ -75,6 +72,7 @@ class window.CPU
 		# Perform the command
 		switch op.cmd
 			when 'ADC'
+				value = @ram.get(addr)
 				@reg.a.add(value, @status.carry)
 
 				@status.carry = @reg.a.carry
@@ -82,6 +80,7 @@ class window.CPU
 				@status.overflow = @reg.a.overflow
 				@status.negative = @reg.a.neg
 			when 'AND'
+				value = @ram.get(addr)
 				@reg.a.set(@reg.a.val & value)
 				@status.zero = @reg.a.zero
 				@status.negative = @reg.a.neg
@@ -108,6 +107,7 @@ class window.CPU
 				if @status.zero
 					@reg.p.set(addr)
 			when 'BIT'			
+				value = @ram.get(addr)
 				@status.zero = (@reg.a.val & value) == 0
 				@status.overflow = (value & 0x40) != 0
 				@status.negative = (value & 0x80) != 0
@@ -136,16 +136,19 @@ class window.CPU
 			when 'CLD'
 				@status.decimal = false
 			when 'CMP'
+				value = @ram.get(addr)
 				@status.carry = @reg.a.val >= value
 				temp = (@reg.a.val - value + 0x100) & 0xFF
 				@status.zero = (temp == 0)
 				@status.negative = (temp > 0x7F)
 			when 'CPX'
+				value = @ram.get(addr)
 				temp = (@reg.x.val - value + 0x100) & 0xFF
 				@status.carry = (temp <= 0x80)
 				@status.zero = (temp == 0)
 				@status.negative = (temp > 0x7F)
 			when 'CPY'
+				value = @ram.get(addr)
 				temp = (@reg.y.val - value + 0x100) & 0xFF
 				@status.carry = (temp <= 0x80)
 				@status.zero = (temp == 0)
@@ -165,6 +168,7 @@ class window.CPU
 				@status.zero = @reg.y.zero
 				@status.negative = @reg.y.neg
 			when 'EOR'
+				value = @ram.get(addr)
 				@reg.a.set(@reg.a.val ^ value)
 				@status.zero = @reg.a.zero
 				@status.negative = @reg.a.neg
@@ -190,14 +194,17 @@ class window.CPU
 				@pushStack(newAddr & 0xFF)
 				@reg.p.set(addr)
 			when 'LDA'
+				value = @ram.get(addr)
 				@reg.a.set(value)
 				@status.zero = @reg.a.zero
 				@status.negative = @reg.a.neg
 			when 'LDX'
+				value = @ram.get(addr)
 				@reg.x.set(value)
 				@status.zero = @reg.x.zero
 				@status.negative = @reg.x.neg
 			when 'LDY'
+				value = @ram.get(addr)
 				@reg.y.set(value)
 				@status.zero = @reg.y.zero
 				@status.negative = @reg.y.neg
@@ -217,6 +224,7 @@ class window.CPU
 			when 'NOP'
 				0 # Do nothing
 			when 'ORA'
+				value = @ram.get(addr)
 				@reg.a.set(@reg.a.val | value)
 				@status.zero = @reg.a.zero
 				@status.negative = @reg.a.neg
@@ -265,6 +273,7 @@ class window.CPU
 				@reg.p.set(byteToAddr(@popStack(), @popStack()))
 				@reg.p.add(1)
 			when 'SBC'
+				value = @ram.get(addr)
 				@reg.a.sub(value, not @status.carry)
 				@status.carry = @reg.a.val < 0x80
 				@status.zero = @reg.a.zero
@@ -308,7 +317,7 @@ class window.CPU
 
 			# Unofficial Opcodes
 			when 'DCP'
-				value = ((value + 0x100) - 1) & 0xFF
+				value = ((@ram.get(addr) + 0x100) - 1) & 0xFF
 				@ram.set(addr, value)
 
 				@status.carry = @reg.a.val >= value
@@ -316,7 +325,7 @@ class window.CPU
 				@status.zero = (temp == 0)
 				@status.negative = (temp > 0x7F)
 			when 'ISC'
-				value = (value+1) & 0xFF
+				value = (@ram.get(addr) + 1) & 0xFF
 				@ram.set(addr, value)
 
 				@reg.a.sub(value, not @status.carry)
@@ -325,11 +334,13 @@ class window.CPU
 				@status.overflow = @reg.a.overflow
 				@status.negative = @reg.a.neg
 			when 'LAX'
+				value = @ram.get(addr)
 				@reg.a.set(value)
 				@reg.x.set(value)
 				@status.zero = @reg.a.zero
 				@status.negative = @reg.a.neg
 			when 'RLA'
+				value = @ram.get(addr)
 				oldCarry = if @status.carry then 0x01 else 0x0
 				@status.carry = (value & 0x80) != 0
 				value = ((value << 1) & 0xFF) | oldCarry
@@ -339,6 +350,7 @@ class window.CPU
 				@status.zero = @reg.a.zero
 				@status.negative = @reg.a.neg
 			when 'RRA'
+				value = @ram.get(addr)
 				oldCarry = if @status.carry then 0x80 else 0x0
 				@status.carry = (value & 0x01) != 0
 				value = (value >> 1) | oldCarry
@@ -353,6 +365,7 @@ class window.CPU
 				temp = @reg.a.val & @reg.x.val
 				@ram.set(addr, temp)
 			when 'SLO'
+				value = @ram.get(addr)
 				@status.carry = (value & 0x80) != 0
 				value = (value << 1) & 0xFF
 				@ram.set(addr, value)
@@ -361,6 +374,7 @@ class window.CPU
 				@status.zero = @reg.a.zero
 				@status.negative = @reg.a.neg
 			when 'SRE'
+				value = @ram.get(addr)
 				@status.carry = (value & 0x01) != 0
 				value = value >> 1
 				@ram.set(addr, value)
