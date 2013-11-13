@@ -27,7 +27,7 @@ class window.PPU
 			'#F8D878', '#D8F878', '#B8F8B8', '#B8F8D8', '#00FCFC', '#F8D8F8', '#000000', '#000000']
 
 	debug: () ->
-		console.log @reg, @hasChrRam, @rom.chr, @vram
+		console.log @reg, @hasChrRam, @rom.chr, @vram, @oam
 
 	getVRam: (addr) ->
 		#console.log("get", addr.toString(16))
@@ -82,9 +82,11 @@ class window.PPU
 
 		switch addr
 			when 0
-				console.log("set controller", value.toString(2))
+				#console.log("set controller", value.toString(2))
+				0
 			when 1
-				console.log("set mask", value.toString(2))
+				#console.log("set mask", value.toString(2))
+				0
 			when 3
 				@oamAddr = value
 			when 4
@@ -113,7 +115,8 @@ class window.PPU
 				@address = (@address + 1)
 
 	oamDma: (value) ->
-		@oam[i] = @ram.get(value | i) for i in [0...0x100]
+		value = value << 8
+		@oam[(@oamAddr + i) & 0xFF] = @ram.get(value | i) for i in [0...0x100]
 
 	debugNameTable: (row, col) ->
 		nameTable = @getVRam(0x2000 + (row*32) + col)

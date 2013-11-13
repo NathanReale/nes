@@ -1,9 +1,13 @@
 window.start = ->
 	#romName = 'nestest.nes'
 	romName = 'nestress.nes'
+	#romName = 'nes15.nes'
+
+	#romName = 'Donkey Kong.nes'
+
 	#romName = 'palette_ram.nes'
 	#romName = 'vram_access.nes'
-	#romName = 'Donkey Kong.nes'
+	#romName = 'sprite_ram.nes'
 	if localStorage[romName]
 		run str2ab(localStorage[romName])
 	else 
@@ -18,13 +22,13 @@ window.start = ->
 		xhr.send()
 
 window.run = (data) ->
-	nes = new NES(data, false)
+	nes = new NES(data, true)
 	#nes.reg.p.set(0xC000)
 
 	#while nes.step() then
 	#nes.step() for c in [0...24758]
-	nes.step() for num in [0...100000]
-	#nes.debug()
+	nes.step() for num in [0...25000]
+	nes.debug()
 
 	canvas = document.getElementById('screen')
 	printScreen(nes, canvas)

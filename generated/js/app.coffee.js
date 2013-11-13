@@ -581,10 +581,11 @@
 
   window.run = function(data) {
     var canvas, nes, num, _i;
-    nes = new NES(data, false);
-    for (num = _i = 0; _i < 100000; num = ++_i) {
+    nes = new NES(data, true);
+    for (num = _i = 0; _i < 25000; num = ++_i) {
       nes.step();
     }
+    nes.debug();
     canvas = document.getElementById('screen');
     return printScreen(nes, canvas);
   };
@@ -2108,7 +2109,7 @@
     }
 
     PPU.prototype.debug = function() {
-      return console.log(this.reg, this.hasChrRam, this.rom.chr, this.vram);
+      return console.log(this.reg, this.hasChrRam, this.rom.chr, this.vram, this.oam);
     };
 
     PPU.prototype.getVRam = function(addr) {
@@ -2168,9 +2169,9 @@
       this.reg[addr] = value;
       switch (addr) {
         case 0:
-          return console.log("set controller", value.toString(2));
+          return 0;
         case 1:
-          return console.log("set mask", value.toString(2));
+          return 0;
         case 3:
           return this.oamAddr = value;
         case 4:
@@ -2198,9 +2199,10 @@
 
     PPU.prototype.oamDma = function(value) {
       var i, _i, _results;
+      value = value << 8;
       _results = [];
       for (i = _i = 0; 0 <= 0x100 ? _i < 0x100 : _i > 0x100; i = 0 <= 0x100 ? ++_i : --_i) {
-        _results.push(this.oam[i] = this.ram.get(value | i));
+        _results.push(this.oam[(this.oamAddr + i) & 0xFF] = this.ram.get(value | i));
       }
       return _results;
     };
