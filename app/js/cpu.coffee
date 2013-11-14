@@ -423,6 +423,12 @@ class window.CPU
 		@status.overflow = (flags & 1<<6) != 0
 		@status.negative = (flags & 1<<7) != 0
 
+	triggerNMI: ->
+		@pushStack(@reg.p.val >> 8)
+		@pushStack(@reg.p.val & 0xFF)
+		@pushStack(@statusRegister())
+		@reg.p.set((@ram.get(0xFFFB) << 8) | @ram.get(0xFFFA))
+
 	debug: (str) ->
 		console.log "%d: %sA:%s X:%s Y:%s P: %s S:%s",
 			@debugCount++

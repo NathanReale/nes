@@ -1,9 +1,9 @@
 window.start = ->
 	#romName = 'nestest.nes'
-	romName = 'nestress.nes'
+	#romName = 'nestress.nes'
 	#romName = 'nes15.nes'
 
-	#romName = 'Donkey Kong.nes'
+	romName = 'Donkey Kong.nes'
 
 	#romName = 'palette_ram.nes'
 	#romName = 'vram_access.nes'
@@ -22,11 +22,13 @@ window.start = ->
 		xhr.send()
 
 window.run = (data) ->
-	nes = new NES(data, true)
+	nes = new NES(data, false)
 	#nes.reg.p.set(0xC000)
 
 	#while nes.step() then
 	#nes.step() for c in [0...24758]
+	nes.step() for num in [0...25000]
+	nes.cpu.triggerNMI()
 	nes.step() for num in [0...25000]
 	nes.debug()
 

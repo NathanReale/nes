@@ -518,6 +518,13 @@
       return this.status.negative = (flags & 1 << 7) !== 0;
     };
 
+    CPU.prototype.triggerNMI = function() {
+      this.pushStack(this.reg.p.val >> 8);
+      this.pushStack(this.reg.p.val & 0xFF);
+      this.pushStack(this.statusRegister());
+      return this.reg.p.set((this.ram.get(0xFFFB) << 8) | this.ram.get(0xFFFA));
+    };
+
     CPU.prototype.debug = function(str) {
       return console.log("%d: %sA:%s X:%s Y:%s P: %s S:%s", this.debugCount++, (arguments.length > 0 ? str + ' ' : ''), this.reg.a.val.toString(16), this.reg.x.val.toString(16), this.reg.y.val.toString(16), this.statusRegister().toString(16), this.reg.s.val.toString(16));
     };
@@ -562,7 +569,7 @@
 
   window.start = function() {
     var romName, xhr;
-    romName = 'nestress.nes';
+    romName = 'Donkey Kong.nes';
     if (localStorage[romName]) {
       return run(str2ab(localStorage[romName]));
     } else {
@@ -580,9 +587,13 @@
   };
 
   window.run = function(data) {
-    var canvas, nes, num, _i;
-    nes = new NES(data, true);
+    var canvas, nes, num, _i, _j;
+    nes = new NES(data, false);
     for (num = _i = 0; _i < 25000; num = ++_i) {
+      nes.step();
+    }
+    nes.cpu.triggerNMI();
+    for (num = _j = 0; _j < 25000; num = ++_j) {
       nes.step();
     }
     nes.debug();
