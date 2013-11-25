@@ -120,7 +120,7 @@ class window.PPU
 				@oam[@oamAddr] = value
 				@oamAddr = (@oamAddr + 1) & 0xFF
 			when 5
-				console.log "set scroll", value
+				#console.log "set scroll", value
 				if @firstScroll
 					@scrollX = value
 				else
@@ -203,7 +203,7 @@ class window.PPU
 					for x in [0...8]
 						if i == 0 and ret[x + sprite.x] != background and sprite.tile[spriteOffset][x] != background
 							@spriteHit = true
-							console.log "sprite hit"
+							#console.log "sprite hit"
 						ret[x + sprite.x + @scrollX] = sprite.tile[spriteOffset][x]
 
 		return ret

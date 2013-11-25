@@ -1881,11 +1881,11 @@ return __p
 }).call(this);
 
 (function() {
-  var drawRow, printScreen, runRom;
+  var cache, drawRow, printScreen, runRom, x, y, _i, _j;
 
   window.start = function() {
     var romName, xhr;
-    romName = 'nes15.nes';
+    romName = 'Donkey Kong Jr.nes';
     if (localStorage[romName]) {
       return run(str2ab(localStorage[romName]));
     } else {
@@ -1915,9 +1915,8 @@ return __p
     return interval = setInterval(function() {
       var ppuX, row, scanline, _results;
       console.log("Frame", counter);
-      if (counter === 50) {
+      if (counter === 500) {
         clearInterval(interval);
-        nes.ppu.debug();
       }
       counter += 1;
       scanline = 0;
@@ -1925,11 +1924,11 @@ return __p
       _results = [];
       while (scanline < 261) {
         if (cyclesLeft === 0) {
-          cyclesLeft = nes.step() * 3;
+          cyclesLeft = nes.step();
         }
-        ppuX += 1;
+        ppuX += 3;
         cyclesLeft -= 1;
-        if (ppuX === 340) {
+        if (ppuX >= 340) {
           if (scanline === 0) {
             nes.ppu.endVblank();
           }
@@ -1944,7 +1943,7 @@ return __p
             nes.ppu.startVblank();
           }
           scanline += 1;
-          _results.push(ppuX = 0);
+          _results.push(ppuX -= 340);
         } else {
           _results.push(void 0);
         }
@@ -1959,27 +1958,41 @@ return __p
     return runRom('sprite_ram.nes', 'sprite_ram', 20);
   };
 
+  cache = [];
+
+  for (x = _i = 0; _i < 240; x = ++_i) {
+    cache[x] = [];
+    for (y = _j = 0; _j < 256; y = ++_j) {
+      cache[x][y] = 0;
+    }
+  }
+
   drawRow = function(row, x, ctx, scale) {
-    var y, _i, _results;
+    var _k, _results;
     if (scale == null) {
       scale = 1;
     }
     _results = [];
-    for (y = _i = 0; _i < 256; y = ++_i) {
-      ctx.fillStyle = row[y];
-      _results.push(ctx.fillRect(y * scale, x * scale, scale, scale));
+    for (y = _k = 0; _k < 256; y = ++_k) {
+      if (row[y] !== cache[x][y]) {
+        ctx.fillStyle = row[y];
+        ctx.fillRect(y * scale, x * scale, scale, scale);
+        _results.push(cache[x][y] = row[y]);
+      } else {
+        _results.push(void 0);
+      }
     }
     return _results;
   };
 
   printScreen = function(nes, canvas, scale) {
-    var ctx, row, x, _i, _results;
+    var ctx, row, _k, _results;
     if (scale == null) {
       scale = 1;
     }
     ctx = canvas.getContext('2d');
     _results = [];
-    for (x = _i = 0; _i < 240; x = _i += 1) {
+    for (x = _k = 0; _k < 240; x = _k += 1) {
       row = nes.ppu.debugScanLine(x);
       _results.push(drawRow(row, x, ctx, scale));
     }
@@ -3629,7 +3642,6 @@ return __p
           this.oam[this.oamAddr] = value;
           return this.oamAddr = (this.oamAddr + 1) & 0xFF;
         case 5:
-          console.log("set scroll", value);
           if (this.firstScroll) {
             this.scrollX = value;
           } else {
@@ -3718,7 +3730,6 @@ return __p
             for (x = _l = 0; _l < 8; x = ++_l) {
               if (i === 0 && ret[x + sprite.x] !== background && sprite.tile[spriteOffset][x] !== background) {
                 this.spriteHit = true;
-                console.log("sprite hit");
               }
               ret[x + sprite.x + this.scrollX] = sprite.tile[spriteOffset][x];
             }

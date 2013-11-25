@@ -1,10 +1,10 @@
 window.start = ->
 	#romName = 'nestest.nes'
 	#romName = 'nestress.nes'
-	romName = 'nes15.nes'
+	#romName = 'nes15.nes'
 
 	#romName = 'Donkey Kong.nes'
-	#romName = 'Donkey Kong Jr.nes'
+	romName = 'Donkey Kong Jr.nes'
 	#romName = 'SuperMarioBros.nes'
 
 	if localStorage[romName]
@@ -44,22 +44,22 @@ window.run = (data) ->
 	interval = setInterval( ->
 		console.log("Frame", counter)
 
-		if counter == 50
+		if counter == 500
 			clearInterval(interval)
 			#printScreen(nes, canvas, 3)
-			nes.ppu.debug()
+			#nes.ppu.debug()
 		counter += 1
 
 		scanline = 0
 		ppuX = 0
 		while scanline < 261
 			if cyclesLeft == 0
-				cyclesLeft = nes.step() * 3
+				cyclesLeft = nes.step()
 
-			ppuX += 1
+			ppuX += 3
 			cyclesLeft -= 1
 
-			if ppuX == 340
+			if ppuX >= 340
 				if scanline == 0
 					nes.ppu.endVblank()
 
@@ -73,7 +73,7 @@ window.run = (data) ->
 					nes.ppu.startVblank()
 
 				scanline += 1
-				ppuX = 0
+				ppuX -= 340
 
 	, 1000.0/60)
 
@@ -82,10 +82,19 @@ window.testRoms = () ->
 	runRom 'vram_access.nes', 'vram_access', 20
 	runRom 'sprite_ram.nes', 'sprite_ram', 20
 
+cache = []
+for x in [0...240]
+	cache[x] = []
+	for y in [0...256]
+		cache[x][y] = 0
+
 drawRow = (row, x, ctx, scale = 1) ->
 	for y in [0...256]
+		if row[y] != cache[x][y]
 			ctx.fillStyle = row[y]
 			ctx.fillRect(y*scale, x*scale, scale, scale)
+			cache[x][y] = row[y]
+
 
 printScreen = (nes, canvas, scale = 1) ->
 	ctx = canvas.getContext('2d');
