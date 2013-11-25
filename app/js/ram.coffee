@@ -1,5 +1,5 @@
 class window.Ram
-	constructor: (@rom) ->
+	constructor: (@rom, @controller) ->
 		@ram = (0xFF for num in [0...0x800])
 		@apu = (0x00 for num in [0...0x20])
 
@@ -13,6 +13,9 @@ class window.Ram
 
 		if index >= 0x2000 and index < 0x4000
 			return @ppu.getReg(index%8)
+
+		if index == 0x4016
+			return @controller.read()
 
 		if index >= 0x4000 and index < 0x4020
 			return @apu[index%0x20]
@@ -32,6 +35,8 @@ class window.Ram
 			@ppu.setReg(index%8,  value)
 		else if index == 0x4014
 			@ppu.oamDma(value)
+		else if index == 0x4016
+			@controller.write(value)
 		else if index >= 0x4000 and index < 0x4020
 			@apu[index%0x20] = value
 		else

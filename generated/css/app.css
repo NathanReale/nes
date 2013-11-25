@@ -1,4 +1,4 @@
-.hello {
-  background-color: #efefef;
-  border: 1px solid #dedede;
+#screen {
+  width: 768px;
+  height: 720px;
 }

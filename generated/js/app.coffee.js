@@ -1,4 +1,64 @@
 (function() {
+  window.Controller = (function() {
+    function Controller() {
+      var that;
+      this.lastInput = 0;
+      this.index = 0;
+      this.state = [0, 0, 0, 0, 0, 0, 0, 0];
+      that = this;
+      window.onkeydown = function(key) {
+        return that.setKey(key, 1);
+      };
+      window.onkeyup = function(key) {
+        return that.setKey(key, 0);
+      };
+    }
+
+    Controller.prototype.write = function(value) {
+      if (this.lastInput === 1 && value === 0) {
+        this.index = 0;
+      }
+      return this.lastInput = value;
+    };
+
+    Controller.prototype.read = function() {
+      var ret;
+      ret = 0;
+      if (this.index < 8) {
+        ret = this.state[this.index];
+      }
+      this.index = (this.index + 1) % 24;
+      return ret;
+    };
+
+    Controller.prototype.setKey = function(key, value) {
+      switch (key.keyCode) {
+        case 65:
+          return this.state[0] = value;
+        case 66:
+          return this.state[1] = value;
+        case 90:
+          return this.state[2] = value;
+        case 88:
+          return this.state[3] = value;
+        case 38:
+          return this.state[4] = value;
+        case 40:
+          return this.state[5] = value;
+        case 37:
+          return this.state[6] = value;
+        case 39:
+          return this.state[7] = value;
+      }
+    };
+
+    return Controller;
+
+  })();
+
+}).call(this);
+
+(function() {
   window.CPU = (function() {
     function CPU(ram, reg, printDebug) {
       this.ram = ram;
@@ -31,22 +91,25 @@
         }
         return _results;
       }).call(this);
-      debugStr = this.reg.p.val.toString(16) + ' ' + ((function() {
-        var _i, _len, _results;
-        _results = [];
-        for (_i = 0, _len = bytes.length; _i < _len; _i++) {
-          x = bytes[_i];
-          _results.push(x.toString(16));
-        }
-        return _results;
-      })()).join(' ') + ((function() {
-        var _i, _ref, _results;
-        _results = [];
-        for (x = _i = _ref = op.bytes; _ref <= 3 ? _i <= 3 : _i >= 3; x = _ref <= 3 ? ++_i : --_i) {
-          _results.push('  ');
-        }
-        return _results;
-      })()).join(' ') + '\t ' + op.cmd + ' ';
+      debugStr = '';
+      if (this.printDebug) {
+        debugStr = this.reg.p.val.toString(16) + ' ' + ((function() {
+          var _i, _len, _results;
+          _results = [];
+          for (_i = 0, _len = bytes.length; _i < _len; _i++) {
+            x = bytes[_i];
+            _results.push(x.toString(16));
+          }
+          return _results;
+        })()).join(' ') + ((function() {
+          var _i, _ref, _results;
+          _results = [];
+          for (x = _i = _ref = op.bytes; _ref <= 3 ? _i <= 3 : _i >= 3; x = _ref <= 3 ? ++_i : --_i) {
+            _results.push('  ');
+          }
+          return _results;
+        })()).join(' ') + '\t ' + op.cmd + ' ';
+      }
       addr = (function() {
         switch (op.addr) {
           case 'imp':
@@ -81,8 +144,8 @@
         }
       }).call(this);
       this.reg.p.add(op.bytes);
-      debugStr += (addr !== null ? addr.toString(16) : ' ') + '  \t';
       if (this.printDebug) {
+        debugStr += (addr !== null ? addr.toString(16) : ' ') + '  \t';
         this.debug(debugStr);
       }
       switch (op.cmd) {
@@ -463,7 +526,7 @@
         default:
           throw "Op " + op.cmd + " not implemented.";
       }
-      return true;
+      return op.cycles;
     };
 
     CPU.prototype.pushStack = function(value) {
@@ -518,6 +581,13 @@
       return this.status.negative = (flags & 1 << 7) !== 0;
     };
 
+    CPU.prototype.triggerIRQ = function() {
+      this.pushStack(this.reg.p.val >> 8);
+      this.pushStack(this.reg.p.val & 0xFF);
+      this.pushStack(this.statusRegister());
+      return this.reg.p.set((this.ram.get(0xFFFF) << 8) | this.ram.get(0xFFFE));
+    };
+
     CPU.prototype.triggerNMI = function() {
       this.pushStack(this.reg.p.val >> 8);
       this.pushStack(this.reg.p.val & 0xFF);
@@ -565,11 +635,11 @@
 }).call(this);
 
 (function() {
-  var printScreen;
+  var drawRow, printScreen, runRom;
 
   window.start = function() {
     var romName, xhr;
-    romName = 'Donkey Kong.nes';
+    romName = 'nes15.nes';
     if (localStorage[romName]) {
       return run(str2ab(localStorage[romName]));
     } else {
@@ -587,51 +657,150 @@
   };
 
   window.run = function(data) {
-    var canvas, nes, num, _i, _j;
+    var canvas, counter, ctx, cyclesLeft, interval, nes, scale;
     nes = new NES(data, false);
-    for (num = _i = 0; _i < 25000; num = ++_i) {
-      nes.step();
-    }
-    nes.cpu.triggerNMI();
-    for (num = _j = 0; _j < 25000; num = ++_j) {
-      nes.step();
-    }
-    nes.debug();
     canvas = document.getElementById('screen');
-    return printScreen(nes, canvas);
+    scale = 3;
+    canvas.width = 256 * scale;
+    canvas.height = 240 * scale;
+    ctx = canvas.getContext('2d');
+    counter = 0;
+    cyclesLeft = 0;
+    return interval = setInterval(function() {
+      var ppuX, row, scanline, _results;
+      console.log("Frame", counter);
+      if (counter === 50) {
+        clearInterval(interval);
+        nes.ppu.debug();
+      }
+      counter += 1;
+      scanline = 0;
+      ppuX = 0;
+      _results = [];
+      while (scanline < 261) {
+        if (cyclesLeft === 0) {
+          cyclesLeft = nes.step() * 3;
+        }
+        ppuX += 1;
+        cyclesLeft -= 1;
+        if (ppuX === 340) {
+          if (scanline === 0) {
+            nes.ppu.endVblank();
+          }
+          if (scanline > 0 && scanline <= 240) {
+            row = nes.ppu.debugScanLine(scanline - 1);
+            drawRow(row, scanline - 1, ctx, scale);
+          }
+          if (scanline === 241) {
+            if ((nes.ppu.reg[0] & 0x80) !== 0) {
+              nes.cpu.triggerNMI();
+            }
+            nes.ppu.startVblank();
+          }
+          scanline += 1;
+          _results.push(ppuX = 0);
+        } else {
+          _results.push(void 0);
+        }
+      }
+      return _results;
+    }, 1000.0 / 60);
   };
 
-  printScreen = function(nes, canvas) {
-    var col, ctx, row, tile, x, y, _i, _results;
-    ctx = canvas.getContext('2d');
+  window.testRoms = function() {
+    runRom('palette_ram.nes', 'palette_ram', 20);
+    runRom('vram_access.nes', 'vram_access', 20);
+    return runRom('sprite_ram.nes', 'sprite_ram', 20);
+  };
+
+  drawRow = function(row, x, ctx, scale) {
+    var y, _i, _results;
+    if (scale == null) {
+      scale = 1;
+    }
     _results = [];
-    for (row = _i = 0; _i < 30; row = _i += 1) {
-      _results.push((function() {
-        var _j, _results1;
-        _results1 = [];
-        for (col = _j = 0; _j < 32; col = _j += 1) {
-          tile = nes.ppu.debugNameTable(row, col);
-          _results1.push((function() {
-            var _k, _results2;
-            _results2 = [];
-            for (x = _k = 0; _k < 8; x = _k += 1) {
-              _results2.push((function() {
-                var _l, _results3;
-                _results3 = [];
-                for (y = _l = 0; _l < 8; y = _l += 1) {
-                  ctx.fillStyle = tile[x][y];
-                  _results3.push(ctx.fillRect(col * 24 + (y * 3), row * 24 + (x * 3), 3, 3));
-                }
-                return _results3;
-              })());
-            }
-            return _results2;
-          })());
-        }
-        return _results1;
-      })());
+    for (y = _i = 0; _i < 256; y = ++_i) {
+      ctx.fillStyle = row[y];
+      _results.push(ctx.fillRect(y * scale, x * scale, scale, scale));
     }
     return _results;
+  };
+
+  printScreen = function(nes, canvas, scale) {
+    var ctx, row, x, _i, _results;
+    if (scale == null) {
+      scale = 1;
+    }
+    ctx = canvas.getContext('2d');
+    _results = [];
+    for (x = _i = 0; _i < 240; x = _i += 1) {
+      row = nes.ppu.debugScanLine(x);
+      _results.push(drawRow(row, x, ctx, scale));
+    }
+    return _results;
+  };
+
+  runRom = function(name, canvasName, frames) {
+    var run, xhr;
+    run = function(data) {
+      var canvas, counter, ctx, cyclesLeft, interval, nes;
+      nes = new NES(data, false);
+      canvas = document.getElementById(canvasName);
+      ctx = canvas.getContext('2d');
+      counter = 0;
+      cyclesLeft = 0;
+      return interval = setInterval(function() {
+        var ppuX, row, scanline, _results;
+        if (counter === frames) {
+          clearInterval(interval);
+        }
+        counter += 1;
+        scanline = 0;
+        ppuX = 0;
+        _results = [];
+        while (scanline < 261) {
+          if (cyclesLeft === 0) {
+            cyclesLeft = nes.step() * 8;
+          }
+          ppuX += 1;
+          cyclesLeft -= 1;
+          if (ppuX === 256) {
+            if (scanline === 0) {
+              nes.ppu.endVblank();
+            }
+            if (scanline > 0 && scanline <= 240) {
+              row = nes.ppu.debugScanLine(scanline - 1);
+              drawRow(row, scanline - 1, ctx, 1);
+            }
+            if (scanline === 241) {
+              if ((nes.ppu.reg[0] & 0x80) !== 0) {
+                nes.cpu.triggerNMI();
+              }
+              nes.ppu.startVblank();
+            }
+            scanline += 1;
+            _results.push(ppuX = 0);
+          } else {
+            _results.push(void 0);
+          }
+        }
+        return _results;
+      }, 1000.0 / 60);
+    };
+    if (localStorage[name]) {
+      return run(str2ab(localStorage[name]));
+    } else {
+      xhr = new XMLHttpRequest;
+      xhr.onload = function() {
+        var rom;
+        rom = new Uint8Array(this.response);
+        localStorage[name] = ab2str(this.response);
+        return run(rom);
+      };
+      xhr.open('GET', 'img/' + name, true);
+      xhr.responseType = 'arraybuffer';
+      return xhr.send();
+    }
   };
 
 }).call(this);
@@ -641,8 +810,9 @@
     function NES(data, printDebug) {
       var index, _i;
       this.printDebug = printDebug != null ? printDebug : false;
+      this.controller = new Controller();
       this.rom = new ROM(data);
-      this.ram = new Ram(this.rom);
+      this.ram = new Ram(this.rom, this.controller);
       this.reg = {
         p: new Register(16),
         s: new Register(8),
@@ -2112,15 +2282,34 @@
       this.reg[2] = 0x80;
       this.address = 0;
       this.oamAddr = 0;
-      this.scroll;
+      this.scrollX = this.scrollY = 0;
       this.readBuffer = 0;
       this.firstAddr = true;
       this.firstScroll = true;
+      this.spriteHit = false;
+      this.vblank = false;
       this.colors = ['#7C7C7C', '#0000FC', '#0000BC', '#4428BC', '#940084', '#A80020', '#A81000', '#881400', '#503000', '#007800', '#006800', '#005800', '#004058', '#000000', '#000000', '#000000', '#BCBCBC', '#0078F8', '#0058F8', '#6844FC', '#D800CC', '#E40058', '#F83800', '#E45C10', '#AC7C00', '#00B800', '#00A800', '#00A844', '#008888', '#000000', '#000000', '#000000', '#F8F8F8', '#3CBCFC', '#6888FC', '#9878F8', '#F878F8', '#F85898', '#F87858', '#FCA044', '#F8B800', '#B8F818', '#58D854', '#58F898', '#00E8D8', '#787878', '#000000', '#000000', '#FCFCFC', '#A4E4FC', '#B8B8F8', '#D8B8F8', '#F8B8F8', '#F8A4C0', '#F0D0B0', '#FCE0A8', '#F8D878', '#D8F878', '#B8F8B8', '#B8F8D8', '#00FCFC', '#F8D8F8', '#000000', '#000000'];
     }
 
     PPU.prototype.debug = function() {
       return console.log(this.reg, this.hasChrRam, this.rom.chr, this.vram, this.oam);
+    };
+
+    PPU.prototype.startVblank = function() {
+      return this.vblank = true;
+    };
+
+    PPU.prototype.endVblank = function() {
+      this.vblank = false;
+      return this.spriteHit = false;
+    };
+
+    PPU.prototype.getSpriteHit = function() {
+      return this.spriteHit;
+    };
+
+    PPU.prototype.getMirroredAddress = function(addr) {
+      return addr & 0xFBFF;
     };
 
     PPU.prototype.getVRam = function(addr) {
@@ -2134,6 +2323,8 @@
           addr -= 0x10;
         }
         return this.vram[0x3F00 + addr];
+      } else if (addr >= 0x2000 && addr < 0x3000) {
+        return this.vram[this.getMirroredAddress(addr)];
       } else {
         return this.vram[addr];
       }
@@ -2148,6 +2339,8 @@
           addr -= 0x10;
         }
         return this.vram[0x3F00 + addr] = value;
+      } else if (addr >= 0x2000 && addr < 0x3000) {
+        return this.vram[this.getMirroredAddress(addr)] = value;
       } else {
         return this.vram[addr] = value;
       }
@@ -2158,21 +2351,22 @@
       switch (addr) {
         case 2:
           this.firstAddr = this.firstScroll = true;
-          return 0x80;
+          ret = 0;
+          ret = ret | (this.spriteHit ? 0x40 : 0x0);
+          ret = ret | (this.vblank ? 0x80 : 0x0);
+          return ret;
         case 4:
           return this.oam[this.oamAddr];
         case 7:
           if (this.address >= 0x3F00) {
             ret = this.getVRam(this.address);
             this.readBuffer = this.getVRam(this.address - 0x1000);
-            this.address = this.address + 1;
-            return ret;
           } else {
             ret = this.readBuffer;
             this.readBuffer = this.getVRam(this.address);
-            this.address = this.address + 1;
-            return ret;
           }
+          this.address = this.address + ((this.reg[0] & 0x4) !== 0 ? 32 : 1);
+          return ret;
       }
     };
 
@@ -2189,10 +2383,11 @@
           this.oam[this.oamAddr] = value;
           return this.oamAddr = (this.oamAddr + 1) & 0xFF;
         case 5:
+          console.log("set scroll", value);
           if (this.firstScroll) {
-            this.scroll = (value << 8) | (this.scroll & 0x00FF);
+            this.scrollX = value;
           } else {
-            this.scroll = value | (this.scroll & 0xFF00);
+            this.scrollY = value;
           }
           return this.firstScroll = !this.firstScroll;
         case 6:
@@ -2204,7 +2399,7 @@
           return this.firstAddr = !this.firstAddr;
         case 7:
           this.setVRam(this.address, value);
-          return this.address = this.address + 1;
+          return this.address = this.address + ((this.reg[0] & 0x4) === 0 ? 1 : 32);
       }
     };
 
@@ -2218,28 +2413,86 @@
       return _results;
     };
 
+    PPU.prototype.debugSprite = function(offset) {
+      var palette, sprite;
+      sprite = {};
+      sprite.x = this.oam[(offset * 4) + 3];
+      sprite.y = this.oam[offset * 4] + 1;
+      palette = this.getPalette(this.oam[(offset * 4) + 2] & 0x3, true);
+      sprite.tile = this.getTile(this.oam[(offset * 4) + 1], palette, true);
+      return sprite;
+    };
+
     PPU.prototype.debugNameTable = function(row, col) {
-      var attribute, attributeValue, nameTable, palette, tile;
-      nameTable = this.getVRam(0x2000 + (row * 32) + col);
-      attributeValue = this.getVRam(0x23C0 + (Math.floor(row / 2) * 8) + Math.floor(col / 2));
+      var address, attribute, attributeValue, nameTable, palette, tile;
+      address = 0x2000 + ((this.reg[0] & 0x3) * 0x400);
+      nameTable = this.getVRam(address + (row * 32) + col);
+      attributeValue = this.getVRam(address + 0x3C0 + (Math.floor(row / 4) * 8) + Math.floor(col / 4));
       attribute = null;
-      if (row % 2 === 1 && col % 2 === 1) {
+      if (row % 4 < 2 && col % 4 < 2) {
         attribute = attributeValue & 0x3;
-      } else if (row % 2 === 1 && col % 2 === 0) {
+      } else if (row % 4 < 2 && col % 4 >= 2) {
         attribute = (attributeValue >> 2) & 0x3;
-      } else if (row % 2 === 0 && col % 2 === 1) {
+      } else if (row % 4 >= 2 && col % 4 < 2) {
         attribute = (attributeValue >> 4) & 0x3;
-      } else if (row % 2 === 0 && col % 2 === 0) {
+      } else if (row % 4 >= 2 && col % 4 >= 2) {
         attribute = (attributeValue >> 6) & 0x3;
       }
-      palette = this.getBackgroundPalette(attribute);
+      palette = this.getPalette(attribute);
       tile = this.getTile(nameTable, palette);
       return tile;
     };
 
-    PPU.prototype.getTile = function(tileNumber, palette) {
+    PPU.prototype.debugScanLine = function(y) {
+      var background, col, i, offset, ret, row, sprite, spriteOffset, tile, x, _i, _j, _k, _l;
+      row = Math.floor(y / 8);
+      offset = y % 8;
+      ret = (function() {
+        var _i, _results;
+        _results = [];
+        for (_i = 1; _i <= 256; _i++) {
+          _results.push(0);
+        }
+        return _results;
+      })();
+      background = this.colors[this.getVRam(0x3F00)];
+      if ((this.reg[1] & 0x08) !== 0) {
+        for (col = _i = 0; _i < 32; col = ++_i) {
+          tile = this.debugNameTable(row, col);
+          for (x = _j = 0; _j < 8; x = ++_j) {
+            ret[(col * 8) + x + this.scrollX] = tile[offset][x];
+          }
+        }
+      }
+      if ((this.reg[1] & 0x10) !== 0) {
+        for (i = _k = 0; _k < 64; i = ++_k) {
+          sprite = this.debugSprite(i);
+          if (sprite.y <= y && sprite.y > (y - 8)) {
+            spriteOffset = (y - sprite.y) % 8;
+            for (x = _l = 0; _l < 8; x = ++_l) {
+              if (i === 0 && ret[x + sprite.x] !== background && sprite.tile[spriteOffset][x] !== background) {
+                this.spriteHit = true;
+                console.log("sprite hit");
+              }
+              ret[x + sprite.x + this.scrollX] = sprite.tile[spriteOffset][x];
+            }
+          }
+        }
+      }
+      return ret;
+    };
+
+    PPU.prototype.getTile = function(tileNumber, palette, sprite) {
       var b, h, i, l, offset, tile, value, _i, _j;
-      offset = (this.reg[0] & 0x10) !== 0 ? 0x1000 : 0;
+      if (sprite == null) {
+        sprite = false;
+      }
+      offset = 0;
+      if (sprite) {
+        offset = (this.reg[0] & 0x8) !== 0 ? 0x1000 : 0;
+      } else {
+        offset = (this.reg[0] & 0x10) !== 0 ? 0x1000 : 0;
+      }
       tile = [];
       for (i = _i = 0; _i < 8; i = _i += 1) {
         h = this.getVRam(offset + (tileNumber * 16) + i);
@@ -2254,12 +2507,15 @@
       return tile;
     };
 
-    PPU.prototype.getBackgroundPalette = function(number) {
+    PPU.prototype.getPalette = function(number, sprite) {
       var colors, i, _i;
+      if (sprite == null) {
+        sprite = false;
+      }
       colors = [];
       colors[0] = this.getVRam(0x3F00);
       for (i = _i = 1; _i <= 3; i = ++_i) {
-        colors[i] = this.getVRam(0x3F00 + (3 * number) + i);
+        colors[i] = this.getVRam((sprite ? 0x3F10 : 0x3F00) + (4 * number) + i);
       }
       return colors;
     };
@@ -2272,9 +2528,10 @@
 
 (function() {
   window.Ram = (function() {
-    function Ram(rom) {
+    function Ram(rom, controller) {
       var num;
       this.rom = rom;
+      this.controller = controller;
       this.ram = (function() {
         var _i, _results;
         _results = [];
@@ -2305,6 +2562,9 @@
       if (index >= 0x2000 && index < 0x4000) {
         return this.ppu.getReg(index % 8);
       }
+      if (index === 0x4016) {
+        return this.controller.read();
+      }
       if (index >= 0x4000 && index < 0x4020) {
         return this.apu[index % 0x20];
       }
@@ -2324,6 +2584,8 @@
         return this.ppu.setReg(index % 8, value);
       } else if (index === 0x4014) {
         return this.ppu.oamDma(value);
+      } else if (index === 0x4016) {
+        return this.controller.write(value);
       } else if (index >= 0x4000 && index < 0x4020) {
         return this.apu[index % 0x20] = value;
       } else {

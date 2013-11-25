@@ -1,8 +1,9 @@
 class window.NES
 	constructor: (data, @printDebug = false) ->
 		
+		@controller = new Controller()
 		@rom = new ROM(data)
-		@ram = new Ram(@rom)
+		@ram = new Ram(@rom, @controller)
 		@reg =
 			p: new Register(16)
 			s: new Register(8)

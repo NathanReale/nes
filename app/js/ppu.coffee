@@ -9,12 +9,15 @@ class window.PPU
 		@address = 0
 		@oamAddr = 0
 
-		@scroll
+		@scrollX = @scrollY = 0
 
 		@readBuffer = 0
 
 		@firstAddr = true
 		@firstScroll = true
+
+		@spriteHit = false
+		@vblank = false
 
 		@colors = [
 			'#7C7C7C', '#0000FC', '#0000BC', '#4428BC', '#940084', '#A80020', '#A81000', '#881400',
@@ -29,6 +32,20 @@ class window.PPU
 	debug: () ->
 		console.log @reg, @hasChrRam, @rom.chr, @vram, @oam
 
+	startVblank: ->
+		@vblank = true
+
+	endVblank: ->
+		@vblank = false
+		@spriteHit = false
+
+	getSpriteHit: ->
+		return @spriteHit
+
+	getMirroredAddress: (addr) ->
+		#return addr & 0xF7FF
+		return addr & 0xFBFF
+
 	getVRam: (addr) ->
 		#console.log("get", addr.toString(16))
 		if not @hasChrRam and addr < 0x2000
@@ -40,6 +57,8 @@ class window.PPU
 			if addr >= 0x10 and (addr & 0x3) == 0
 				addr -= 0x10
 			return @vram[0x3F00 + addr]
+		else if addr >= 0x2000 and addr < 0x3000
+			return @vram[@getMirroredAddress(addr)]
 		else
 			return @vram[addr]
 
@@ -52,6 +71,8 @@ class window.PPU
 			if addr >= 0x10 and (addr & 0x3) == 0
 				addr -= 0x10
 			@vram[0x3F00 + addr] = value
+		else if addr >= 0x2000 and addr < 0x3000
+			@vram[@getMirroredAddress(addr)] = value
 		else
 			@vram[addr] = value
 
@@ -60,7 +81,13 @@ class window.PPU
 		switch addr
 			when 2
 				@firstAddr = @firstScroll = true
-				return 0x80
+
+				ret = 0
+				ret = ret | if @spriteHit then 0x40 else 0x0
+				ret = ret | if @vblank then 0x80 else 0x0
+
+				# console.log ret, @spriteHit, @vblank
+				return ret
 			when 4
 				return @oam[@oamAddr]
 			when 7
@@ -68,13 +95,12 @@ class window.PPU
 				if @address >= 0x3F00
 					ret = @getVRam(@address)
 					@readBuffer = @getVRam(@address - 0x1000)
-					@address = (@address + 1)
-					return ret
 				else
 					ret = @readBuffer
 					@readBuffer = @getVRam(@address)
-					@address = (@address + 1)
-					return ret
+				
+				@address = @address + (if (@reg[0] & 0x4) != 0 then 32 else 1)
+				return ret	
 
 	setReg: (addr, value) ->
 		#console.log "set", addr.toString(16), value.toString(16)
@@ -94,10 +120,11 @@ class window.PPU
 				@oam[@oamAddr] = value
 				@oamAddr = (@oamAddr + 1) & 0xFF
 			when 5
+				console.log "set scroll", value
 				if @firstScroll
-					@scroll = (value << 8) | (@scroll & 0x00FF)
+					@scrollX = value
 				else
-					@scroll = (value) | (@scroll & 0xFF00)
+					@scrollY = value
 
 				@firstScroll = not @firstScroll
 
@@ -108,32 +135,47 @@ class window.PPU
 					@address = (value) | (@address & 0xFF00)
 
 				@firstAddr = not @firstAddr
+				#console.log "set address", value.toString(16), @address.toString(16)
 
 			when 7
-				# console.log "set vram", @address.toString(16), value.toString(16)
+				#console.log "set vram", @address.toString(16), value.toString(16)
 				@setVRam(@address, value)
-				@address = (@address + 1)
+				@address = @address + (if (@reg[0] & 0x4) == 0 then 1 else 32)
 
 	oamDma: (value) ->
+
 		value = value << 8
 		@oam[(@oamAddr + i) & 0xFF] = @ram.get(value | i) for i in [0...0x100]
 
-	debugNameTable: (row, col) ->
-		nameTable = @getVRam(0x2000 + (row*32) + col)
+	debugSprite: (offset) ->
 
-		attributeValue = @getVRam(0x23C0 + (Math.floor(row/2)*8) + Math.floor(col/2))
+		sprite = {}
+
+		sprite.x = @oam[(offset*4) + 3]
+		sprite.y = @oam[(offset*4)] + 1
+
+		palette = @getPalette(@oam[(offset*4) + 2] & 0x3, true)
+		sprite.tile = @getTile(@oam[(offset*4) + 1], palette, true)
+
+		return sprite
+
+	debugNameTable: (row, col) ->
+		address = 0x2000 + ((@reg[0] & 0x3) * 0x400)
+		nameTable = @getVRam(address + (row*32) + col)
+
+		attributeValue = @getVRam(address + 0x3C0 + (Math.floor(row/4)*8) + Math.floor(col/4))
 		attribute = null
 
-		if row%2 == 1 and col%2 == 1
+		if row%4 < 2 and col%4 < 2
 			attribute = attributeValue & 0x3
-		else if row%2 == 1 and col%2 == 0
+		else if row%4 < 2 and col%4 >= 2
 			attribute = (attributeValue >> 2) & 0x3
-		else if row%2 == 0 and col%2 == 1
+		else if row%4 >= 2 and col%4 < 2
 			attribute = (attributeValue >> 4) & 0x3
-		else if row%2 == 0 and col%2 == 0
+		else if row%4 >= 2 and col%4 >= 2
 			attribute = (attributeValue >> 6) & 0x3
 
-		palette = @getBackgroundPalette(attribute)
+		palette = @getPalette(attribute)
 
 		tile = @getTile(nameTable, palette)
 
@@ -141,8 +183,38 @@ class window.PPU
 
 		return tile
 
-	getTile: (tileNumber, palette) ->
-		offset = if (@reg[0] & 0x10) != 0 then 0x1000 else 0
+	debugScanLine: (y) ->
+		row = Math.floor(y/8)
+		offset = y%8
+		ret = (0 for [1..256])
+		background = @colors[@getVRam(0x3F00)]
+
+		if (@reg[1] & 0x08) != 0
+			for col in [0...32]
+				tile = @debugNameTable(row, col)
+				for x in [0...8]
+					ret[(col*8) + x + @scrollX] = tile[offset][x]
+
+		if (@reg[1] & 0x10) != 0
+			for i in [0...64]
+				sprite = @debugSprite(i)
+				if sprite.y <= y and sprite.y > (y-8)
+					spriteOffset = (y - sprite.y)%8
+					for x in [0...8]
+						if i == 0 and ret[x + sprite.x] != background and sprite.tile[spriteOffset][x] != background
+							@spriteHit = true
+							console.log "sprite hit"
+						ret[x + sprite.x + @scrollX] = sprite.tile[spriteOffset][x]
+
+		return ret
+
+	getTile: (tileNumber, palette, sprite = false) ->
+		offset = 0
+		if sprite
+			offset = if (@reg[0] & 0x8) != 0 then 0x1000 else 0
+		else
+			offset = if (@reg[0] & 0x10) != 0 then 0x1000 else 0
+
 		tile = []
 		for i in [0...8] by 1
 			h = @getVRam(offset + (tileNumber*16) + i)
@@ -158,11 +230,10 @@ class window.PPU
 
 		return tile
 
-	getBackgroundPalette: (number) ->
+	getPalette: (number, sprite = false) ->
 		colors = []
 		colors[0] = @getVRam(0x3F00)
 
-		colors[i] = @getVRam(0x3F00 + (3*number) + i) for i in [1..3]
+		colors[i] = @getVRam((if sprite then 0x3F10 else 0x3F00) + (4*number) + i) for i in [1..3]
 
 		return colors
-

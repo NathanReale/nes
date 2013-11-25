@@ -25,8 +25,10 @@ class window.CPU
 		# Pull bytes from memory that this command uses
 		bytes = (@ram.get(@reg.p.val+i) for i in [0...(op.bytes)])
 
-		debugStr = @reg.p.val.toString(16) + ' ' + (x.toString(16) for x in bytes).join(' ') + 
-			('  ' for x in [op.bytes..3]).join(' ') + '\t ' + op.cmd + ' '
+		debugStr = ''
+		if @printDebug
+			debugStr = @reg.p.val.toString(16) + ' ' + (x.toString(16) for x in bytes).join(' ') + 
+			 	('  ' for x in [op.bytes..3]).join(' ') + '\t ' + op.cmd + ' '
 
 		# Get the address for this command, if applicable
 		addr = switch op.addr
@@ -66,8 +68,9 @@ class window.CPU
 		# Increment Program Counter - Only matters if there is no jump/branch
 		@reg.p.add(op.bytes)
 
-		debugStr += (if addr != null then addr.toString(16) else ' ') + '  \t'
-		@debug(debugStr) if @printDebug
+		if @printDebug
+			debugStr += (if addr != null then addr.toString(16) else ' ') + '  \t'
+			@debug(debugStr)
 
 		# Perform the command
 		switch op.cmd
@@ -388,7 +391,7 @@ class window.CPU
 				throw "Op " + op.cmd + " not implemented."
 
 
-		return true
+		return op.cycles
 
 	pushStack: (value) ->
 		@ram.set(@reg.s.val + 0x100, value)
@@ -422,6 +425,12 @@ class window.CPU
 		@status.break = (flags & 1<<4) != 0
 		@status.overflow = (flags & 1<<6) != 0
 		@status.negative = (flags & 1<<7) != 0
+
+	triggerIRQ: ->
+		@pushStack(@reg.p.val >> 8)
+		@pushStack(@reg.p.val & 0xFF)
+		@pushStack(@statusRegister())
+		@reg.p.set((@ram.get(0xFFFF) << 8) | @ram.get(0xFFFE))
 
 	triggerNMI: ->
 		@pushStack(@reg.p.val >> 8)

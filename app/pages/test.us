@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title><%= pkg.name %></title>
+
+		<link rel="stylesheet" type="text/css" href="css/app.css" media="all" />
+	</head>
+	<body>
+		<section id="main">
+			<canvas id="palette_ram" width="256" height="240"></canvas>
+			<canvas id="vram_access" width="256" height="240"></canvas>
+			<canvas id="sprite_ram" width="256" height="240"></canvas>
+		</section>
+		<script type="text/javascript" src="js/app.js"></script>
+		<script type="text/javascript">
+			window.testRoms()
+		</script>
+	</body>
+</html>
