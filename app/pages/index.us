@@ -7,7 +7,7 @@
 	</head>
 	<body>
 		<section id="main">
-			<canvas id="screen" width="768" height="720"></canvas>
+			<canvas id="screen" width="768" height="720"></canvas><br />
 			<select id="roms"></select>
 			<button id="stop">Stop</button>
 		</section>
