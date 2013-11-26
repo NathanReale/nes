@@ -3,8 +3,8 @@ window.start = ->
 	#romName = 'nestress.nes'
 	#romName = 'nes15.nes'
 
-	#romName = 'Donkey Kong.nes'
-	romName = 'Donkey Kong Jr.nes'
+	romName = 'Donkey Kong.nes'
+	#romName = 'Donkey Kong Jr.nes'
 	#romName = 'SuperMarioBros.nes'
 
 	if localStorage[romName]
@@ -44,7 +44,7 @@ window.run = (data) ->
 	interval = setInterval( ->
 		console.log("Frame", counter)
 
-		if counter == 500
+		if counter == 1000
 			clearInterval(interval)
 			#printScreen(nes, canvas, 3)
 			#nes.ppu.debug()

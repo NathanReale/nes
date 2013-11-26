@@ -151,11 +151,20 @@ class window.PPU
 
 		sprite = {}
 
+		flags = @oam[(offset*4) + 2]
+
 		sprite.x = @oam[(offset*4) + 3]
 		sprite.y = @oam[(offset*4)] + 1
 
-		palette = @getPalette(@oam[(offset*4) + 2] & 0x3, true)
+		palette = @getPalette(flags & 0x3, true)
 		sprite.tile = @getTile(@oam[(offset*4) + 1], palette, true)
+
+		if (flags & 0x40) != 0
+			for x in [0...8]
+				sprite.tile[x].reverse()
+
+		if (flags & 0x80) != 0
+			sprite.tile.reverse()
 
 		return sprite
 
@@ -204,7 +213,8 @@ class window.PPU
 						if i == 0 and ret[x + sprite.x] != background and sprite.tile[spriteOffset][x] != background
 							@spriteHit = true
 							#console.log "sprite hit"
-						ret[x + sprite.x + @scrollX] = sprite.tile[spriteOffset][x]
+						if sprite.tile[spriteOffset][x] != background
+							ret[x + sprite.x + @scrollX] = sprite.tile[spriteOffset][x]
 
 		return ret
 
@@ -221,8 +231,8 @@ class window.PPU
 			l = @getVRam(offset + (tileNumber*16) + i + 8)
 			tile[i] = []
 			for b in [0...8] by 1
-				value = if (h & (1 << b)) == 0 then 0 else 2
-				value += if (l & (1 << b)) == 0 then  0 else 1
+				value = if (h & (1 << b)) == 0 then 0 else 1
+				value += if (l & (1 << b)) == 0 then  0 else 2
 				tile[i][7-b] = @colors[palette[value]];
 
 			#console.log(i + '|', tile[i][7], tile[i][6], tile[i][5], tile[i][4],
@@ -234,6 +244,8 @@ class window.PPU
 		colors = []
 		colors[0] = @getVRam(0x3F00)
 
-		colors[i] = @getVRam((if sprite then 0x3F10 else 0x3F00) + (4*number) + i) for i in [1..3]
+		offset = (if sprite then 0x3F10 else 0x3F00) + (4*number)
+
+		colors[i] = @getVRam(offset + i) for i in [1..3]
 
 		return colors

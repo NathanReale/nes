@@ -639,7 +639,7 @@
 
   window.start = function() {
     var romName, xhr;
-    romName = 'Donkey Kong Jr.nes';
+    romName = 'Donkey Kong.nes';
     if (localStorage[romName]) {
       return run(str2ab(localStorage[romName]));
     } else {
@@ -669,7 +669,7 @@
     return interval = setInterval(function() {
       var ppuX, row, scanline, _results;
       console.log("Frame", counter);
-      if (counter === 500) {
+      if (counter === 1000) {
         clearInterval(interval);
       }
       counter += 1;
@@ -2426,12 +2426,21 @@
     };
 
     PPU.prototype.debugSprite = function(offset) {
-      var palette, sprite;
+      var flags, palette, sprite, x, _i;
       sprite = {};
+      flags = this.oam[(offset * 4) + 2];
       sprite.x = this.oam[(offset * 4) + 3];
       sprite.y = this.oam[offset * 4] + 1;
-      palette = this.getPalette(this.oam[(offset * 4) + 2] & 0x3, true);
+      palette = this.getPalette(flags & 0x3, true);
       sprite.tile = this.getTile(this.oam[(offset * 4) + 1], palette, true);
+      if ((flags & 0x40) !== 0) {
+        for (x = _i = 0; _i < 8; x = ++_i) {
+          sprite.tile[x].reverse();
+        }
+      }
+      if ((flags & 0x80) !== 0) {
+        sprite.tile.reverse();
+      }
       return sprite;
     };
 
@@ -2485,7 +2494,9 @@
               if (i === 0 && ret[x + sprite.x] !== background && sprite.tile[spriteOffset][x] !== background) {
                 this.spriteHit = true;
               }
-              ret[x + sprite.x + this.scrollX] = sprite.tile[spriteOffset][x];
+              if (sprite.tile[spriteOffset][x] !== background) {
+                ret[x + sprite.x + this.scrollX] = sprite.tile[spriteOffset][x];
+              }
             }
           }
         }
@@ -2510,8 +2521,8 @@
         l = this.getVRam(offset + (tileNumber * 16) + i + 8);
         tile[i] = [];
         for (b = _j = 0; _j < 8; b = _j += 1) {
-          value = (h & (1 << b)) === 0 ? 0 : 2;
-          value += (l & (1 << b)) === 0 ? 0 : 1;
+          value = (h & (1 << b)) === 0 ? 0 : 1;
+          value += (l & (1 << b)) === 0 ? 0 : 2;
           tile[i][7 - b] = this.colors[palette[value]];
         }
       }
@@ -2519,14 +2530,15 @@
     };
 
     PPU.prototype.getPalette = function(number, sprite) {
-      var colors, i, _i;
+      var colors, i, offset, _i;
       if (sprite == null) {
         sprite = false;
       }
       colors = [];
       colors[0] = this.getVRam(0x3F00);
+      offset = (sprite ? 0x3F10 : 0x3F00) + (4 * number);
       for (i = _i = 1; _i <= 3; i = ++_i) {
-        colors[i] = this.getVRam((sprite ? 0x3F10 : 0x3F00) + (4 * number) + i);
+        colors[i] = this.getVRam(offset + i);
       }
       return colors;
     };
