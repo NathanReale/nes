@@ -1,92 +1,55 @@
+currentInterval = null
+cache = []
+
 window.start = ->
-	#romName = 'nestest.nes'
-	#romName = 'nestress.nes'
-	#romName = 'nes15.nes'
 
-	romName = 'Donkey Kong.nes'
-	#romName = 'Donkey Kong Jr.nes'
-	#romName = 'SuperMarioBros.nes'
+	for x in [0...240]
+		cache[x] = []
+		for y in [0...256]
+			cache[x][y] = 0
 
-	if localStorage[romName]
-		run str2ab(localStorage[romName])
-	else 
-		xhr = new XMLHttpRequest
-		xhr.onload = ->
-			rom = new Uint8Array(this.response)
-			localStorage[romName] = ab2str(this.response)
-			run rom
-				
-		xhr.open 'GET', 'img/' + romName, true
-		xhr.responseType = 'arraybuffer'
-		xhr.send()
+	romList = [
+		{file:'nestest.nes', name:'NES Test'}
+		{file:'nestress.nes', name:'NEStress'}
+		{file:'nes15.nes', name:'NES 15'}
+		{file:'Donkey Kong.nes', name:'Donkey Kong'}
+		{file:'Donkey Kong Jr.nes', name:'Donkey Kong Jr.'}
+		{file:'SuperMarioBros.nes', name:'Super Mario Bros.'}
+	]
+	selectedRom = 'Donkey Kong Jr.'
 
-window.run = (data) ->
-	nes = new NES(data, false)
-	#nes.reg.p.set(0xC000)
+	romSel = document.getElementById('roms')
+	stopButton = document.getElementById('stop')
 
-	#while nes.step() then
-	#nes.step() for c in [0...24758]
-	# nes.step() for num in [0...25000]
-	# nes.cpu.triggerNMI()
-	# nes.step() for num in [0...25000]
-	# nes.debug()
+	# Build the drop down list of roms
+	for rom in romList
+		option = document.createElement('option')
+		option.text = rom.name
+		option.value = rom.file
+		if rom.name == selectedRom
+			option.selected = 'selected'
+		romSel.appendChild(option)
 
-	canvas = document.getElementById('screen')
-	scale = 3
-	canvas.width = (256*scale)
-	canvas.height = (240*scale)
-	ctx = canvas.getContext('2d');
-	
-	#nes.step() for num in [0...25000]
+	# Stop the currently running rom, if there is one
+	stopButton.onclick = (e) ->
+		if currentInterval != null
+			clearInterval(currentInterval)
 
-	counter = 0
-	cyclesLeft = 0
-	interval = setInterval( ->
-		console.log("Frame", counter)
+	# When the user selects a different rom, stop anything currently running and load the new rom
+	romSel.onchange = (e) ->
+		if currentInterval != null
+			clearInterval(currentInterval)
+		runRom(e.target.value, 'screen', 1000, 3, false)
 
-		if counter == 1000
-			clearInterval(interval)
-			#printScreen(nes, canvas, 3)
-			#nes.ppu.debug()
-		counter += 1
+	# Start the initial rom
+	runRom(romSel.value, 'screen', 1000, 3, false)
 
-		scanline = 0
-		ppuX = 0
-		while scanline < 261
-			if cyclesLeft == 0
-				cyclesLeft = nes.step()
-
-			ppuX += 3
-			cyclesLeft -= 1
-
-			if ppuX >= 340
-				if scanline == 0
-					nes.ppu.endVblank()
-
-				if scanline > 0 and scanline <= 240
-					row = nes.ppu.debugScanLine(scanline-1)
-					drawRow(row, scanline-1, ctx, scale)
-
-				if scanline == 241
-					if (nes.ppu.reg[0] & 0x80) != 0
-						nes.cpu.triggerNMI()
-					nes.ppu.startVblank()
-
-				scanline += 1
-				ppuX -= 340
-
-	, 1000.0/60)
 
 window.testRoms = () ->
-	runRom 'palette_ram.nes', 'palette_ram', 20
-	runRom 'vram_access.nes', 'vram_access', 20
-	runRom 'sprite_ram.nes', 'sprite_ram', 20
+	runRom 'palette_ram.nes', 'palette_ram', 200
+	runRom 'vram_access.nes', 'vram_access', 200
+	runRom 'sprite_ram.nes', 'sprite_ram', 200
 
-cache = []
-for x in [0...240]
-	cache[x] = []
-	for y in [0...256]
-		cache[x][y] = 0
 
 drawRow = (row, x, ctx, scale = 1) ->
 	for y in [0...256]
@@ -95,7 +58,7 @@ drawRow = (row, x, ctx, scale = 1) ->
 			ctx.fillRect(y*scale, x*scale, scale, scale)
 			cache[x][y] = row[y]
 
-
+# Debugging - prints the entire screen as once
 printScreen = (nes, canvas, scale = 1) ->
 	ctx = canvas.getContext('2d');
 
@@ -103,55 +66,42 @@ printScreen = (nes, canvas, scale = 1) ->
 		row = nes.ppu.debugScanLine(x)
 		drawRow(row, x, ctx, scale)
 
-	# for row in [0...30] by 1
-	# 	for col in [0...32] by 1
-	# 		tile = nes.ppu.debugNameTable(row, col)
-
-	# 		for x in [0...8] by 1
-	# 			for y in [0...8] by 1
-	# 				ctx.fillStyle = tile[x][y]
-	# 				ctx.fillRect(col*(8*scale) + (y*scale), row*(8*scale) + (x*scale), scale, scale)
-
-
-	# for s in [0...64]
-	# 	sprite = nes.ppu.debugSprite(s)
-	# 	for x in [0...8] by 1
-	# 		for y in [0...8] by 1
-	# 			ctx.fillStyle = sprite.tile[x][y]
-	# 			ctx.fillRect((sprite.x * scale) + (y*scale), (sprite.y * scale) + (x*scale), scale, scale)
-
-runRom = (name, canvasName, frames) ->
+runRom = (name, canvasName, frames, scale = 1, debug = false) ->
 	run = (data) ->
-		nes = new NES(data, false)
+		nes = new NES(data, debug)
 
 		canvas = document.getElementById(canvasName)
+		canvas.width = (256*scale)
+		canvas.height = (240*scale)
 		ctx = canvas.getContext('2d');
 		
 		counter = 0
 		cyclesLeft = 0
-		interval = setInterval( ->
+		currentInterval = setInterval( ->
+			console.log("Frame", counter)
 
 			if counter == frames
-				clearInterval(interval)
+				clearInterval(currentInterval)
 				#printScreen(nes, canvas, 3)
+				#nes.ppu.debug()
 			counter += 1
 
 			scanline = 0
 			ppuX = 0
 			while scanline < 261
 				if cyclesLeft == 0
-					cyclesLeft = nes.step() * 8
+					cyclesLeft = nes.step()
 
-				ppuX += 1
+				ppuX += 3
 				cyclesLeft -= 1
 
-				if ppuX == 256
+				if ppuX >= 340
 					if scanline == 0
 						nes.ppu.endVblank()
 
 					if scanline > 0 and scanline <= 240
 						row = nes.ppu.debugScanLine(scanline-1)
-						drawRow(row, scanline-1, ctx, 1)
+						drawRow(row, scanline-1, ctx, scale)
 
 					if scanline == 241
 						if (nes.ppu.reg[0] & 0x80) != 0
@@ -159,14 +109,14 @@ runRom = (name, canvasName, frames) ->
 						nes.ppu.startVblank()
 
 					scanline += 1
-					ppuX = 0
-
+					ppuX -= 340
 
 		, 1000.0/60)
 
+	# Check if the rom is already stored locally
 	if localStorage[name]
 		run str2ab(localStorage[name])
-	else 
+	else # Load it from the server
 		xhr = new XMLHttpRequest
 		xhr.onload = ->
 			rom = new Uint8Array(this.response)

@@ -635,99 +635,81 @@
 }).call(this);
 
 (function() {
-  var cache, drawRow, printScreen, runRom, x, y, _i, _j;
+  var cache, currentInterval, drawRow, printScreen, runRom;
 
-  window.start = function() {
-    var romName, xhr;
-    romName = 'Donkey Kong.nes';
-    if (localStorage[romName]) {
-      return run(str2ab(localStorage[romName]));
-    } else {
-      xhr = new XMLHttpRequest;
-      xhr.onload = function() {
-        var rom;
-        rom = new Uint8Array(this.response);
-        localStorage[romName] = ab2str(this.response);
-        return run(rom);
-      };
-      xhr.open('GET', 'img/' + romName, true);
-      xhr.responseType = 'arraybuffer';
-      return xhr.send();
-    }
-  };
-
-  window.run = function(data) {
-    var canvas, counter, ctx, cyclesLeft, interval, nes, scale;
-    nes = new NES(data, false);
-    canvas = document.getElementById('screen');
-    scale = 3;
-    canvas.width = 256 * scale;
-    canvas.height = 240 * scale;
-    ctx = canvas.getContext('2d');
-    counter = 0;
-    cyclesLeft = 0;
-    return interval = setInterval(function() {
-      var ppuX, row, scanline, _results;
-      console.log("Frame", counter);
-      if (counter === 1000) {
-        clearInterval(interval);
-      }
-      counter += 1;
-      scanline = 0;
-      ppuX = 0;
-      _results = [];
-      while (scanline < 261) {
-        if (cyclesLeft === 0) {
-          cyclesLeft = nes.step();
-        }
-        ppuX += 3;
-        cyclesLeft -= 1;
-        if (ppuX >= 340) {
-          if (scanline === 0) {
-            nes.ppu.endVblank();
-          }
-          if (scanline > 0 && scanline <= 240) {
-            row = nes.ppu.debugScanLine(scanline - 1);
-            drawRow(row, scanline - 1, ctx, scale);
-          }
-          if (scanline === 241) {
-            if ((nes.ppu.reg[0] & 0x80) !== 0) {
-              nes.cpu.triggerNMI();
-            }
-            nes.ppu.startVblank();
-          }
-          scanline += 1;
-          _results.push(ppuX -= 340);
-        } else {
-          _results.push(void 0);
-        }
-      }
-      return _results;
-    }, 1000.0 / 60);
-  };
-
-  window.testRoms = function() {
-    runRom('palette_ram.nes', 'palette_ram', 20);
-    runRom('vram_access.nes', 'vram_access', 20);
-    return runRom('sprite_ram.nes', 'sprite_ram', 20);
-  };
+  currentInterval = null;
 
   cache = [];
 
-  for (x = _i = 0; _i < 240; x = ++_i) {
-    cache[x] = [];
-    for (y = _j = 0; _j < 256; y = ++_j) {
-      cache[x][y] = 0;
+  window.start = function() {
+    var option, rom, romList, romSel, selectedRom, stopButton, x, y, _i, _j, _k, _len;
+    for (x = _i = 0; _i < 240; x = ++_i) {
+      cache[x] = [];
+      for (y = _j = 0; _j < 256; y = ++_j) {
+        cache[x][y] = 0;
+      }
     }
-  }
+    romList = [
+      {
+        file: 'nestest.nes',
+        name: 'NES Test'
+      }, {
+        file: 'nestress.nes',
+        name: 'NEStress'
+      }, {
+        file: 'nes15.nes',
+        name: 'NES 15'
+      }, {
+        file: 'Donkey Kong.nes',
+        name: 'Donkey Kong'
+      }, {
+        file: 'Donkey Kong Jr.nes',
+        name: 'Donkey Kong Jr.'
+      }, {
+        file: 'SuperMarioBros.nes',
+        name: 'Super Mario Bros.'
+      }
+    ];
+    selectedRom = 'Donkey Kong Jr.';
+    romSel = document.getElementById('roms');
+    stopButton = document.getElementById('stop');
+    for (_k = 0, _len = romList.length; _k < _len; _k++) {
+      rom = romList[_k];
+      option = document.createElement('option');
+      option.text = rom.name;
+      option.value = rom.file;
+      if (rom.name === selectedRom) {
+        option.selected = 'selected';
+      }
+      romSel.appendChild(option);
+    }
+    stopButton.onclick = function(e) {
+      if (currentInterval !== null) {
+        return clearInterval(currentInterval);
+      }
+    };
+    romSel.onchange = function(e) {
+      if (currentInterval !== null) {
+        clearInterval(currentInterval);
+      }
+      return runRom(e.target.value, 'screen', 1000, 3, false);
+    };
+    return runRom(romSel.value, 'screen', 1000, 3, false);
+  };
+
+  window.testRoms = function() {
+    runRom('palette_ram.nes', 'palette_ram', 200);
+    runRom('vram_access.nes', 'vram_access', 200);
+    return runRom('sprite_ram.nes', 'sprite_ram', 200);
+  };
 
   drawRow = function(row, x, ctx, scale) {
-    var _k, _results;
+    var y, _i, _results;
     if (scale == null) {
       scale = 1;
     }
     _results = [];
-    for (y = _k = 0; _k < 256; y = ++_k) {
+    for (y = _i = 0; _i < 256; y = ++_i) {
       if (row[y] !== cache[x][y]) {
         ctx.fillStyle = row[y];
         ctx.fillRect(y * scale, x * scale, scale, scale);
@@ -740,32 +722,41 @@
   };
 
   printScreen = function(nes, canvas, scale) {
-    var ctx, row, _k, _results;
+    var ctx, row, x, _i, _results;
     if (scale == null) {
       scale = 1;
     }
     ctx = canvas.getContext('2d');
     _results = [];
-    for (x = _k = 0; _k < 240; x = _k += 1) {
+    for (x = _i = 0; _i < 240; x = _i += 1) {
       row = nes.ppu.debugScanLine(x);
       _results.push(drawRow(row, x, ctx, scale));
     }
     return _results;
   };
 
-  runRom = function(name, canvasName, frames) {
+  runRom = function(name, canvasName, frames, scale, debug) {
     var run, xhr;
+    if (scale == null) {
+      scale = 1;
+    }
+    if (debug == null) {
+      debug = false;
+    }
     run = function(data) {
-      var canvas, counter, ctx, cyclesLeft, interval, nes;
-      nes = new NES(data, false);
+      var canvas, counter, ctx, cyclesLeft, nes;
+      nes = new NES(data, debug);
       canvas = document.getElementById(canvasName);
+      canvas.width = 256 * scale;
+      canvas.height = 240 * scale;
       ctx = canvas.getContext('2d');
       counter = 0;
       cyclesLeft = 0;
-      return interval = setInterval(function() {
+      return currentInterval = setInterval(function() {
         var ppuX, row, scanline, _results;
+        console.log("Frame", counter);
         if (counter === frames) {
-          clearInterval(interval);
+          clearInterval(currentInterval);
         }
         counter += 1;
         scanline = 0;
@@ -773,17 +764,17 @@
         _results = [];
         while (scanline < 261) {
           if (cyclesLeft === 0) {
-            cyclesLeft = nes.step() * 8;
+            cyclesLeft = nes.step();
           }
-          ppuX += 1;
+          ppuX += 3;
           cyclesLeft -= 1;
-          if (ppuX === 256) {
+          if (ppuX >= 340) {
             if (scanline === 0) {
               nes.ppu.endVblank();
             }
             if (scanline > 0 && scanline <= 240) {
               row = nes.ppu.debugScanLine(scanline - 1);
-              drawRow(row, scanline - 1, ctx, 1);
+              drawRow(row, scanline - 1, ctx, scale);
             }
             if (scanline === 241) {
               if ((nes.ppu.reg[0] & 0x80) !== 0) {
@@ -792,7 +783,7 @@
               nes.ppu.startVblank();
             }
             scanline += 1;
-            _results.push(ppuX = 0);
+            _results.push(ppuX -= 340);
           } else {
             _results.push(void 0);
           }
