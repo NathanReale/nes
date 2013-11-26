@@ -692,9 +692,9 @@
       if (currentInterval !== null) {
         clearInterval(currentInterval);
       }
-      return runRom(e.target.value, 'screen', 1000, 3, false);
+      return runRom(e.target.value, 'screen', -1, 3, false);
     };
-    return runRom(romSel.value, 'screen', 1000, 3, false);
+    return runRom(romSel.value, 'screen', -1, 3, false);
   };
 
   window.testRoms = function() {

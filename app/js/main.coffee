@@ -39,10 +39,10 @@ window.start = ->
 	romSel.onchange = (e) ->
 		if currentInterval != null
 			clearInterval(currentInterval)
-		runRom(e.target.value, 'screen', 1000, 3, false)
+		runRom(e.target.value, 'screen', -1, 3, false)
 
 	# Start the initial rom
-	runRom(romSel.value, 'screen', 1000, 3, false)
+	runRom(romSel.value, 'screen', -1, 3, false)
 
 
 window.testRoms = () ->
